@@ -11,6 +11,14 @@ const docker = new Docker();
 const db = require('./include/container-manager-db.js');
 const dockerHelper = require('./include/container-manager-docker-helper.js');
 
+//ARCH to append -arm to the end of a container name if running on arm
+//swarm mode dose not use this for now
+var ARCH = '';
+//if (process.arch == 'arm') {
+//	ARCH = '-arm';
+//}
+
+
 const ip = '127.0.0.1';
 const arbiterKey = fs.readFileSync("/run/secrets/CM_KEY",{encoding:'base64'});
 
@@ -37,11 +45,6 @@ if(DATABOX_SDK == 1) {
 	console.log("Using sdk registry::", Config.registryUrl);
 }
 
-//ARCH to append -arm to the end of a container name if running on arm
-var ARCH = '';
-if (process.arch == 'arm') {
-	ARCH = '-arm';
-}
 
 var arbiterAgent; //An https agent that will not reject certs signed by the CM
 var httpsHelper;
