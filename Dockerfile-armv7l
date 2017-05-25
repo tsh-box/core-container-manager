@@ -1,4 +1,4 @@
-FROM node:alpine
+FROM armhf/node:7.9.0
 
 ADD ./package.json /package.json
 RUN npm install --production && npm run clean
@@ -13,4 +13,3 @@ LABEL databox.type="container-manager"
 EXPOSE 8989
 
 CMD ["npm", "start"]
-#CMD ["sleep","99999"]

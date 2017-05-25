@@ -94,6 +94,7 @@ module.exports = {
 		});
 
 		// Needs to be after the proxy
+		app.use(bodyParser.json());
 		app.use(bodyParser.urlencoded({extended: false}));
 
 		app.get('/', (req, res) => {
@@ -109,7 +110,7 @@ module.exports = {
 				.then((containers) => {
 					return new Promise((resolve, reject) => {
 						for (const container of containers) {
-							const name = container.Names[0].substr(1);
+							const name = container.Names[0].substr(1).split('.')[0];
 							if (name === containerName) {
 								resolve({
 									name: name,
@@ -143,7 +144,7 @@ module.exports = {
 			conman.listContainers()
 				.then((containers) => {
 					for (let container of containers) {
-						let name = container.Names[0].substr(1);
+						let name = container.Names[0].substr(1).split('.')[0];
 						names.push(name);
 						result.push({
 							name: name,
@@ -210,42 +211,23 @@ module.exports = {
 			installingApps[sla.name] = sla['databox-type'] === undefined ? 'app' : sla['databox-type'];
 
 			io.emit('docker-create', sla.name);
-			conman.launchContainer(sla)
-				.then((containers) => {
-					console.log('[' + sla.name + '] Installed');
-					for (const container of containers) {
-
-						delete installingApps[sla.name];
-						this.proxies[container.name] = container.name + ':' + container.port;
+			conman.installFromSLA(sla)
+				.then((config) => {
+					console.log('[' + sla.name + '] Installed', config);
+					for (const name of config) {
+						delete installingApps[name];
+						this.proxies[name] = name + ':8080';
+						console.log("Proxy added for ", name)
 					}
 
-					res.json(containers);
+					res.json({status:200,msg:"Success"});
 				})
 				.then(() => {
 					return conman.saveSLA(sla);
 				});
 		});
 
-		app.post('/restart', (req, res) => {
-			//console.log("Restarting " + req.body.id);
-			conman.getContainer(req.body.id)
-				.then((container) => {
-					return conman.stopContainer(container);
-				})
-				.then((container) => {
-					return conman.startContainer(container);
-				})
-				.then((container) => {
-					console.log('[' + container.name + '] Restarted');
-					this.proxies[container.name] = container.name + ':' + container.port;
-				})
-				.catch((err) => {
-					console.log(err);
-					res.json(err);
-				});
-		});
-
-
+		
 		app.post('/uninstall', (req, res) => {
 			//console.log("Uninstalling " + req.body.id);
 			conman.getContainer(req.body.id)

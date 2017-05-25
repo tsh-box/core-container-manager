@@ -1,4 +1,5 @@
-FROM node:alpine
+FROM aarch64/node:7.7.2 
+    #TODO this should be node:alpine but there are no uptodate images avalble 
 
 ADD ./package.json /package.json
 RUN npm install --production && npm run clean
