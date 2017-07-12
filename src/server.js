@@ -17,7 +17,7 @@ if (DATABOX_SDK) {
 const Docker = require('dockerode');
 const DockerEvents = require('docker-events');
 const docker = new Docker();
-const dockerEmitter = new DockerEvents({docker:docker});
+const dockerEmitter = new DockerEvents({docker: docker});
 
 const http = require('http');
 const https = require('https');
@@ -137,6 +137,28 @@ module.exports = {
 
 		});
 
+		app.get('/api/list/:type', (req, res) => {
+			conman.listContainers()
+				.then((containers) => {
+					let results = [];
+					for (const container of containers) {
+						if (container.Labels['databox.type'] === req.params.type) {
+							results.push(container);
+						}
+						else if (req.params.type === 'system' && container.Labels['databox.type'] !== 'app'
+							&& container.Labels['databox.type'] !== 'driver' && container.Labels['databox.type'] !== 'store') {
+							results.push(container);
+						}
+					}
+
+					res.header('Access-Control-Allow-Origin', '*');
+					res.header('Access-Control-Allow-Credentials', true);
+					//res.header 'Access-Control-Allow-Methods', 'POST, GET, PUT, DELETE, OPTIONS'
+					//res.header 'Access-Control-Allow-Headers', 'Content-Type'
+					res.json(results);
+				});
+		});
+
 		app.get('/list-apps', (req, res) => {
 			let names = [];
 			let result = [];
@@ -206,8 +228,10 @@ module.exports = {
 
 		});
 
-		app.post('/install', (req, res) => {
-			const sla = JSON.parse(req.body.sla);
+		const jsonParser = bodyParser.json();
+		app.post('/install', jsonParser, (req, res) => {
+			const sla = req.body;
+			console.log(sla);
 			installingApps[sla.name] = sla['databox-type'] === undefined ? 'app' : sla['databox-type'];
 
 			io.emit('docker-create', sla.name);
@@ -220,14 +244,17 @@ module.exports = {
 						console.log("Proxy added for ", name)
 					}
 
-					res.json({status:200,msg:"Success"});
+					res.json({status: 200, msg: "Success"});
 				})
 				.then(() => {
 					return conman.saveSLA(sla);
+				})
+				.catch((error) => {
+					console.log(error);
 				});
 		});
 
-		
+
 		app.post('/uninstall', (req, res) => {
 			//console.log("Uninstalling " + req.body.id);
 			conman.getContainer(req.body.id)

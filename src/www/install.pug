@@ -129,8 +129,15 @@ html
 			}
 
 			function installApp() {
-				$.post("/install", {"sla": JSON.stringify(manifest)}, function (data) {
-					console.log(data);
+				$.ajax({
+					url: "/install",
+					type: "POST",
+					data: JSON.stringify(manifest),
+					contentType: "application/json; charset=utf-8",
+					dataType: "json",
+					success: function () {
+						console.log("Pure jQuery Pure JS object");
+					}
 				});
 				window.location.href = "/";
 			}
