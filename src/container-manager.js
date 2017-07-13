@@ -22,11 +22,11 @@ var ARCH = '';
 const ip = '127.0.0.1';
 const arbiterKey = fs.readFileSync("/run/secrets/CM_KEY",{encoding:'base64'});
 
-const arbiterName =  "databox-arbiter" + ARCH;
-const DATABOX_ARBITER_ENDPOINT = "https://databox-arbiter:8080";
-const DATABOX_LOGSTORE_ENDPOINT = "https://databox-logstore:8080";
-const DATABOX_LOGSTORE_NAME = "databox-logstore";
-const DATABOX_EXPORT_SERVICE_ENDPOINT = "https://databox-export-service:8080";
+const arbiterName =  "arbiter" + ARCH;
+const DATABOX_ARBITER_ENDPOINT = "https://arbiter:8080";
+const DATABOX_LOGSTORE_ENDPOINT = "https://syslog:8080";
+const DATABOX_LOGSTORE_NAME = "syslog";
+const DATABOX_EXPORT_SERVICE_ENDPOINT = "https://export-service:8080";
 
 const certPath = './certs'
 
@@ -370,9 +370,9 @@ async function addPermissionsFromSla (sla) {
 		console.log("SLA:",store,sla);
 
 		//Read /cat for CM
-		console.log('[Adding read permissions] for databox-container-manager on ' + store.name + '/cat');
+		console.log('[Adding read permissions] for container-manager on ' + store.name + '/cat');
 		proms.push(updateContainerPermissions({
-			name: 'databox-container-manager',
+			name: 'container-manager',
 			route: {target: store.name, path: '/cat', method:'GET'}
 		}));
 		

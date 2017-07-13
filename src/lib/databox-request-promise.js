@@ -7,7 +7,7 @@ const fs = require('fs');
 //
 //Databox ENV vars
 //
-const DATABOX_ARBITER_ENDPOINT = process.env.DATABOX_ARBITER_ENDPOINT || "https://databox-arbiter:8080";
+const DATABOX_ARBITER_ENDPOINT = process.env.DATABOX_ARBITER_ENDPOINT || "https://arbiter:8080";
 const ARBITER_TOKEN   = fs.readFileSync("/run/secrets/CM_KEY",{encoding:'base64'});
 
 /**
@@ -41,7 +41,7 @@ module.exports = function (options,callback) {
         //TODO: Lets not hard code these!! 
         var isExternalRequest = host.indexOf('.') !== -1;
         
-        var isExternalDevRequest = host.indexOf("databox-local-registry") !== -1 || host.indexOf("databox-app-server") !== -1 || host.indexOf("localhost") !== -1;
+        var isExternalDevRequest = host.indexOf("app-server") !== -1 || host.indexOf("localhost") !== -1;
         
         var isInternalUiRequest = path.indexOf("/ui") === 0;
 

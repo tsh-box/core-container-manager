@@ -3,7 +3,7 @@ const request = require('request');
 const httpsAgent = require('./databox-https-agent.js');
 const fs = require('fs');
 
-const DATABOX_ARBITER_ENDPOINT = "https://databox-arbiter:8080";
+const DATABOX_ARBITER_ENDPOINT = "https://arbiter:8080";
 const ARBITER_TOKEN   = fs.readFileSync("/run/secrets/CM_KEY",{encoding:'base64'});
 
 var macaroonCache = {};

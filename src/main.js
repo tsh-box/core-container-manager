@@ -18,7 +18,7 @@ httpsHelper.init()
 		//require here so env vars are set!
 		containerMangerUIServer = require('./server.js');
 		//set up the arbiter proxy
-		containerMangerUIServer.proxies['databox-arbiter'] = 'databox-arbiter:8080';
+		containerMangerUIServer.proxies['arbiter'] = 'arbiter:8080';
 
 		console.log("Starting UI Server!!");
 		return containerMangerUIServer.launch(Config.serverPort, conman, httpsHelper);
