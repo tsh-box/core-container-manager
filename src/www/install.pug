@@ -44,7 +44,7 @@ html
 					manifest.packages[0].enabled = true;
 				}
 				if('datasources' in manifest && manifest.datasources.length > 0) {
-					$.get("/databox-arbiter/cat", function (data) {
+					$.get("/arbiter/cat", function (data) {
 						if ('items' in data) {
 							for (var item of data.items) {
 								var link = document.createElement("a");

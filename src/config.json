@@ -1,8 +1,8 @@
 {
 	"registryUrl": "databoxsystems/",
-	"storeUrl": "http://store.upintheclouds.org",
+	"storeUrl": "http://app-server:8181",
 	"registryUrl_dev": "",
-	"storeUrl_dev": "http://databox-app-server:8181",
+	"storeUrl_dev": "http://app-server:8181",
 	"registryUrl_sdk": "registry.iotdatabox.com/",
 	"storeUrl_sdk": "https://store.iotdatabox.com",
 	"serverPort": 8989,

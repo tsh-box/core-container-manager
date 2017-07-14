@@ -239,7 +239,7 @@ const appConfig = function (config,sla) {
 
 	if ('datasources' in sla) {
 		for (let datasource of sla.datasources) {
-			app.Env.push("DATASOURCE_" + datasource.clientid + "=" + JSON.stringify(datasource.hypercat));
+			app.Env.push("DATASOURCE_" + datasource.clientid + "=" + JSON.stringify(datasource.hypercat || {}));
 		}
 	}
 
