@@ -154,7 +154,8 @@ const createSecretes = async function (config,sla) {
 														"GID": "0",
 														"Mode": 292
 													}});
-	//HTTPS certs
+	//HTTPS certs Json
+	//TODO remove this!!
 	let certJson = await httpsHelper.createClientCert(sla.localContainerName)
 	let certSecretName = sla.localContainerName.toUpperCase() + '_PEM'
 	let sec = await docker.createSecret({"Name": certSecretName,"Data": Buffer.from(certJson).toString('base64')})
@@ -166,6 +167,19 @@ const createSecretes = async function (config,sla) {
 														"Mode": 292
 													}});
 	
+	//HTTPS certs pem format
+	certSecretName = sla.localContainerName.toUpperCase() + '.pem';
+	certJson = JSON.parse(certJson);
+	let pem = certJson.clientprivate + certJson.clientpublic + certJson.clientcert;
+	console.log("TOSHTOSHTOSHTOSHTOSHTOSH\n",pem,"TOSHTOSHTOSHTOSHTOSHTOSH\n");
+	sec = await docker.createSecret({"Name": certSecretName,"Data": Buffer.from(pem).toString('base64')})
+				.catch((err)=>{console.log('[ERROR] creating HTTPS secrets',err)});
+	config.TaskTemplate.ContainerSpec.secrets.push({"SecretName":certSecretName, "SecretID":sec.id, "File": {
+														"Name": "DATABOX.pem",
+														"UID": "0",
+														"GID": "0",
+														"Mode": 292
+													}});
 
 	//Arbiter token
 	let arbiterToken = await generateArbiterToken(sla.localContainerName)
