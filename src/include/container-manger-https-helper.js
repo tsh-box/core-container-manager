@@ -12,7 +12,7 @@ const config = { days: 365, keySize: 2048, days: 3650, algorithm: 'sha256' };
 let rootPems;
 
 const certPath = './certs/';
-const devCertPath = '/run/secrets/DATA_BOX_CM.pem';
+const devCertPath = '/run/secrets/DATABOX_CM.pem';
 
 //Generate the CM root cert at startup.
 //If in DEV mode we need to use the same certs at restart because the docker demon has to trust the container manger CA to verify 
@@ -22,9 +22,9 @@ const init = function() {
 
         fs.readFile(devCertPath, function (err, data) {
             
-            if(data === null) {
+            if(err === null) {
                 rootPems = data;
-                resolve({rootCAcert:rootPems.cert});
+                resolve();
                 return;
             } else {
                 reject("[ERROR]" + devCertPath + " not found");
@@ -100,7 +100,7 @@ const createClientCert =  async function (commonName) {
 
         // Sign client cert with root cert
         try {
-            rootPrivateKey = pki.privateKeyFromPem(rootPems.private);
+            rootPrivateKey = pki.privateKeyFromPem(rootPems);
             clientcert.sign(rootPrivateKey);
         } catch (e) {
             reject("ERROR",e);
