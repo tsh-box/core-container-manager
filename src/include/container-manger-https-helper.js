@@ -12,7 +12,7 @@ const config = { days: 365, keySize: 2048, days: 3650, algorithm: 'sha256' };
 let rootPems;
 
 const certPath = './certs/';
-const devCertPath = '/run/secrets/DATA_BOX_CM_PEM.json';
+const devCertPath = '/run/secrets/DATA_BOX_CM.pem';
 
 //Generate the CM root cert at startup.
 //If in DEV mode we need to use the same certs at restart because the docker demon has to trust the container manger CA to verify 
@@ -20,10 +20,10 @@ const devCertPath = '/run/secrets/DATA_BOX_CM_PEM.json';
 const init = function() {
     return new Promise( (resolve, reject) =>  {
 
-        jsonfile.readFile(devCertPath, function (err, obj) {
+        fs.readFile(devCertPath, function (err, data) {
             
-            if(err === null) {
-                rootPems = obj;
+            if(data === null) {
+                rootPems = data;
                 resolve({rootCAcert:rootPems.cert});
                 return;
             } else {
