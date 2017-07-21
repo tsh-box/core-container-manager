@@ -265,7 +265,7 @@ const storeConfig = function (config,sla) {
 	let requiredName = sla.name + "-" + sla['resource-requirements']['store'] + ARCH;
 
 	let store = { 
-				image: rootContainerName,
+				image: Config.registryUrl + rootContainerName,
 				volumes: [ ],
 				Env: [ 
 								"DATABOX_LOCAL_NAME=" + requiredName,
