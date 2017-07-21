@@ -112,7 +112,7 @@ const installFromSLA = async function (sla) {
 				reject('Missing or unsupported databox-type in SLA');
 				return;
 		}
-		console.log(JSON.stringify(containerConfig, null, 4));
+
 		saveSLA(sla);
 
 		//UPDATE SERVICES
@@ -147,7 +147,7 @@ const createSecretes = async function (config,sla) {
 	//add DATABOX_ROOT_CA
 	let rootCA = secrets.filter((itm)=>{ return itm.Spec.Name == 'databox_DATABOX_ROOT_CA'})
 	rootCA = rootCA[0];
-	console.log(rootCA);
+
 	config.TaskTemplate.ContainerSpec.secrets.push({"SecretName":rootCA.Spec.Name, "SecretID":rootCA.ID, "File": {
 														"Name": "DATABOX_ROOT_CA",
 														"UID": "0",
@@ -171,7 +171,7 @@ const createSecretes = async function (config,sla) {
 	certSecretName = sla.localContainerName.toUpperCase() + '.pem';
 	certJson = JSON.parse(certJson);
 	let pem = certJson.clientprivate + certJson.clientpublic + certJson.clientcert;
-	console.log("TOSHTOSHTOSHTOSHTOSHTOSH\n",pem,"TOSHTOSHTOSHTOSHTOSHTOSH\n");
+
 	sec = await docker.createSecret({"Name": certSecretName,"Data": Buffer.from(pem).toString('base64')})
 				.catch((err)=>{console.log('[ERROR] creating HTTPS secrets',err)});
 	config.TaskTemplate.ContainerSpec.secrets.push({"SecretName":certSecretName, "SecretID":sec.id, "File": {
