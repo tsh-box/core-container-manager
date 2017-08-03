@@ -67,6 +67,13 @@ const installFromSLA = async function (sla) {
 			sla.localContainerName = name;
 		}
 
+		//make sure the sla['resource-requirements']['store'] is an array
+		if(sla['resource-requirements'] && sla['resource-requirements']['store']) {
+			if(!Array.isArray(sla['resource-requirements']['store'])) {
+				sla['resource-requirements']['store'] = [sla['resource-requirements']['store']]
+			} 
+		}
+
 		console.log('[' + name + '] Launching');
 
 		//let config = loadGlobalDockerConfig();
@@ -95,18 +102,18 @@ const installFromSLA = async function (sla) {
 					};
 		
 		//Get a deep copy! why is this so difficult !!!
-		let dependentStoreConfig = JSON.parse(JSON.stringify(containerConfig)); 
+		let dependentStoreConfigTemplate = JSON.parse(JSON.stringify(containerConfig)); 
 
 		switch(sla['databox-type']) {
 			case 'app':
 				containerConfig = appConfig(containerConfig,sla);
 				containerConfig = await createSecretes(containerConfig,sla)
-				dependentStoreConfig = storeConfig(dependentStoreConfig,sla)
+				dependentStoreConfigArray = storeConfig(dependentStoreConfigTemplate,sla)
 				break;
 			case 'driver':
 				containerConfig = driverConfig(containerConfig,sla);
 				containerConfig = await createSecretes(containerConfig,sla)
-				dependentStoreConfig = storeConfig(dependentStoreConfig,sla)
+				dependentStoreConfigArray = storeConfig(dependentStoreConfigTemplate,sla)
 				break;
 			default:
 				reject('Missing or unsupported databox-type in SLA');
@@ -116,11 +123,15 @@ const installFromSLA = async function (sla) {
 		saveSLA(sla);
 
 		//UPDATE SERVICES
-		if(dependentStoreConfig !== false) {
-			console.log("[CM] creating dependent store service " + dependentStoreConfig.Name)
-			dependentStoreConfig = await createSecretes(dependentStoreConfig,{"localContainerName": dependentStoreConfig.Name, "databox-type":"store" })
-			await docker.createService(dependentStoreConfig)
-						.catch((err)=>{ console.log("[ERROR] creating dependent store service ", dependentStoreConfig, err)});
+		if(dependentStoreConfigArray !== false) {
+
+			for ( dependentStoreConfig of dependentStoreConfigArray) {
+				console.log("[CM] creating dependent store service " + dependentStoreConfig.Name)
+				dependentStoreConfig = await createSecretes(dependentStoreConfig,{"localContainerName": dependentStoreConfig.Name, "databox-type":"store" })
+				await docker.createService(dependentStoreConfig)
+							.catch((err)=>{ console.log("[ERROR] creating dependent store service ", dependentStoreConfig, err)});
+			}
+
 		}
 		console.log("[CM] creating service " + containerConfig.Name);
 		await docker.createService(containerConfig)
@@ -216,8 +227,17 @@ const driverConfig = function (config,sla) {
 			};
 	
 	if(sla['resource-requirements'] && sla['resource-requirements']['store']) {
-		let storeName = sla.name + "-" + sla['resource-requirements']['store'] + ARCH;
-		driver.Env.push("DATABOX_STORE_ENDPOINT=https://" + storeName + ":8080");
+
+		if(sla['resource-requirements']['store'].length == 1) {
+			//TODO remove this 
+			let storeName = sla.name + "-" + sla['resource-requirements']['store'] + ARCH;
+			driver.Env.push("DATABOX_STORE_ENDPOINT=https://" + storeName + ":8080");
+		} else {
+			for(storeType of sla['resource-requirements']['store']) {
+				let storeName = sla.name + "-" + storeType + ARCH;
+				driver.Env.push("DATABOX_" + storeType.toUpperCase().replace('-','_') + "_ENDPOINT=https://" + storeName + ":8080");
+			}
+		}
 	}
 
 
@@ -257,9 +277,17 @@ const appConfig = function (config,sla) {
 		}
 	}
 
-	if(sla['resource-requirements'] && sla['resource-requirements']['store']) {
-		let storeName = sla.name + "-" + sla['resource-requirements']['store'] + ARCH;
-		app.Env.push("DATABOX_STORE_ENDPOINT=https://" + storeName + ":8080");
+	if (sla['resource-requirements'] && sla['resource-requirements']['store']) {
+		if(sla['resource-requirements']['store'].length == 1) {
+			//TODO remove this 
+			let storeName = sla.name + "-" + sla['resource-requirements']['store'] + ARCH;
+			driver.Env.push("DATABOX_STORE_ENDPOINT=https://" + storeName + ":8080");
+		} else {
+			for(storeType of sla['resource-requirements']['store']) {
+				let storeName = sla.name + "-" + storeType + ARCH;
+				driver.Env.push("DATABOX_" + storeType.toUpperCase().replace('-','_') + "_ENDPOINT=https://" + storeName + ":8080");
+			}
+		}
 	}
 
 	config.Networks.push({Target:'databox_databox-app-net'});
@@ -269,39 +297,50 @@ const appConfig = function (config,sla) {
 	return config;
 };
 
-const storeConfig = function (config,sla) {
+const storeConfig = function (configTemplate,sla) {
 	console.log("addStoreConfig")
+
 	if(!sla['resource-requirements'] || !sla['resource-requirements']['store']) {
 		return false;
 	}
 
-	let rootContainerName = sla['resource-requirements']['store'];
-	let requiredName = sla.name + "-" + sla['resource-requirements']['store'] + ARCH;
+	let stores = sla['resource-requirements']['store']
+	let configArray = [];
+	for( let storeName of stores) { 
 
-	let store = { 
-				image: Config.registryUrl + rootContainerName,
-				volumes: [ ],
-				Env: [ 
-								"DATABOX_LOCAL_NAME=" + requiredName,
-								"DATABOX_ARBITER_ENDPOINT=" + DATABOX_ARBITER_ENDPOINT,
-								"DATABOX_LOGSTORE_ENDPOINT=" + DATABOX_LOGSTORE_ENDPOINT + '/' + requiredName, 
-							],
-				secrets: [ ]
-			};
-	
-	config.Networks.push({Target:'databox_databox-driver-net'});
-	config.Networks.push({Target:'databox_databox-app-net'});
+		let config = JSON.parse(JSON.stringify(configTemplate));
 
-	if('volumes' in sla) {
-		for(let vol of sla.volumes) {
-			store.volumes("/tmp/"+requiredName+"-"+vol.replace('/','')+":"+vol);
+		let rootContainerName = storeName;
+		let requiredName = sla.name + "-" + storeName + ARCH;
+
+		let store = { 
+					image: Config.registryUrl + rootContainerName,
+					volumes: [ ],
+					Env: [ 
+									"DATABOX_LOCAL_NAME=" + requiredName,
+									"DATABOX_ARBITER_ENDPOINT=" + DATABOX_ARBITER_ENDPOINT,
+									"DATABOX_LOGSTORE_ENDPOINT=" + DATABOX_LOGSTORE_ENDPOINT + '/' + requiredName, 
+								],
+					secrets: [ ]
+				};
+		
+		config.Networks.push({Target:'databox_databox-driver-net'});
+		config.Networks.push({Target:'databox_databox-app-net'});
+
+		if('volumes' in sla) {
+			for(let vol of sla.volumes) {
+				store.volumes("/tmp/"+requiredName+"-"+vol.replace('/','')+":"+vol);
+			}
 		}
+
+		config.Name = requiredName
+		config.TaskTemplate.ContainerSpec = store
+		config.TaskTemplate.Placement.constraints = ["node.role == manager"]
+
+		configArray.push(config)
 	}
 
-	config.Name = requiredName
-	config.TaskTemplate.ContainerSpec = store
-	config.TaskTemplate.Placement.constraints = ["node.role == manager"]
-	return config;
+	return configArray;
 };
 
 async function addPermissionsFromSla (sla) {
@@ -379,70 +418,73 @@ async function addPermissionsFromSla (sla) {
 
 	//Add permissions for dependent stores 
 	if(sla['resource-requirements'] && sla['resource-requirements']['store']) {
-		let store = {};
-		store.name = sla.name + "-" + sla['resource-requirements']['store'] + ARCH;
-		console.log("SLA:",store,sla);
-
-		//Read /cat for CM
-		console.log('[Adding read permissions] for container-manager on ' + store.name + '/cat');
-		proms.push(updateContainerPermissions({
-			name: 'container-manager',
-			route: {target: store.name, path: '/cat', method:'GET'}
-		}));
 		
-		//Read /status
-		console.log('[Adding read permissions] for ' + localContainerName + ' on ' + store.name + '/status');
-		proms.push(updateContainerPermissions({
-			name: localContainerName,
-			route: {target: store.name, path: '/status', method:'GET'}
-		}));
-		
-		//Read /ws
-		console.log('[Adding read permissions] for ' + localContainerName + ' on ' + store.name + '/ws');
-		proms.push(updateContainerPermissions({
-			name: localContainerName,
-			route: {target: store.name, path: '/ws', method:'GET'}
-		}));
-		
-		console.log('[Adding read permissions] for ' + localContainerName + ' on ' + store.name + '/sub/*');
-		proms.push(updateContainerPermissions({
-			name: localContainerName,
-			route: {target: store.name, path: '/sub/*', method:'GET'}
-		}));
-		
-		console.log('[Adding read permissions] for ' + localContainerName + ' on ' + store.name + '/unsub/*');
-		proms.push(updateContainerPermissions({
-			name: localContainerName,
-			route: {target: store.name, path: '/unsub/*', method:'GET'}
-		}));
+		for (storeType of sla['resource-requirements']['store']) {
+			
+			let store = {};
+			store.name = sla.name + "-" + storeType + ARCH;
 
-		//Write to all endpoints on dependent store
-		console.log('[Adding write permissions] for ' + localContainerName + ' on ' + store.name);
-		proms.push(updateContainerPermissions({
-			name: localContainerName,
-			route: {target: store.name, path: '/*', method:'POST'}
-		}));
+			//Read /cat for CM
+			console.log('[Adding read permissions] for container-manager on ' + store.name + '/cat');
+			proms.push(updateContainerPermissions({
+				name: 'container-manager',
+				route: {target: store.name, path: '/cat', method:'GET'}
+			}));
+			
+			//Read /status
+			console.log('[Adding read permissions] for ' + localContainerName + ' on ' + store.name + '/status');
+			proms.push(updateContainerPermissions({
+				name: localContainerName,
+				route: {target: store.name, path: '/status', method:'GET'}
+			}));
+			
+			//Read /ws
+			console.log('[Adding read permissions] for ' + localContainerName + ' on ' + store.name + '/ws');
+			proms.push(updateContainerPermissions({
+				name: localContainerName,
+				route: {target: store.name, path: '/ws', method:'GET'}
+			}));
+			
+			console.log('[Adding read permissions] for ' + localContainerName + ' on ' + store.name + '/sub/*');
+			proms.push(updateContainerPermissions({
+				name: localContainerName,
+				route: {target: store.name, path: '/sub/*', method:'GET'}
+			}));
+			
+			console.log('[Adding read permissions] for ' + localContainerName + ' on ' + store.name + '/unsub/*');
+			proms.push(updateContainerPermissions({
+				name: localContainerName,
+				route: {target: store.name, path: '/unsub/*', method:'GET'}
+			}));
 
-		//Read to all endpoints on dependent store (sometimes its nice to read what you have written)
-		console.log('[Adding read permissions] for ' + localContainerName + ' on ' + store.name);
-		proms.push(updateContainerPermissions({
-			name: localContainerName,
-			route: {target: store.name, path: '/*', method:'GET'}
-		}));
+			//Write to all endpoints on dependent store
+			console.log('[Adding write permissions] for ' + localContainerName + ' on ' + store.name);
+			proms.push(updateContainerPermissions({
+				name: localContainerName,
+				route: {target: store.name, path: '/*', method:'POST'}
+			}));
 
-		//Write to /cat on dependent store
-		console.log('[Adding write permissions] for ' + localContainerName + ' on ' + store.name + '/cat');
-		proms.push(updateContainerPermissions({
-			name: localContainerName,
-			route: {target: store.name, path: '/cat', method:'POST'}
-		}));
+			//Read to all endpoints on dependent store (sometimes its nice to read what you have written)
+			console.log('[Adding read permissions] for ' + localContainerName + ' on ' + store.name);
+			proms.push(updateContainerPermissions({
+				name: localContainerName,
+				route: {target: store.name, path: '/*', method:'GET'}
+			}));
 
-		//Grant permissions for the store to write to the log
-		console.log('[Adding write permissions] for ' + store.name + ' on ' + DATABOX_LOGSTORE_NAME + '/' + store.name);
-		proms.push(updateContainerPermissions({
-			name: store.name,
-			route: {target: DATABOX_LOGSTORE_NAME, path: '/' + store.name , method:'POST'}
-		}));
+			//Write to /cat on dependent store
+			console.log('[Adding write permissions] for ' + localContainerName + ' on ' + store.name + '/cat');
+			proms.push(updateContainerPermissions({
+				name: localContainerName,
+				route: {target: store.name, path: '/cat', method:'POST'}
+			}));
+
+			//Grant permissions for the store to write to the log
+			console.log('[Adding write permissions] for ' + store.name + ' on ' + DATABOX_LOGSTORE_NAME + '/' + store.name);
+			proms.push(updateContainerPermissions({
+				name: store.name,
+				route: {target: DATABOX_LOGSTORE_NAME, path: '/' + store.name , method:'POST'}
+			}));
+		}
 
 	}
 
