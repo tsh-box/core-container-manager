@@ -281,11 +281,11 @@ const appConfig = function (config,sla) {
 		if(sla['resource-requirements']['store'].length == 1) {
 			//TODO remove this 
 			let storeName = sla.name + "-" + sla['resource-requirements']['store'] + ARCH;
-			driver.Env.push("DATABOX_STORE_ENDPOINT=https://" + storeName + ":8080");
+			app.Env.push("DATABOX_STORE_ENDPOINT=https://" + storeName + ":8080");
 		} else {
 			for(storeType of sla['resource-requirements']['store']) {
 				let storeName = sla.name + "-" + storeType + ARCH;
-				driver.Env.push("DATABOX_" + storeType.toUpperCase().replace('-','_') + "_ENDPOINT=https://" + storeName + ":8080");
+				app.Env.push("DATABOX_" + storeType.toUpperCase().replace('-','_') + "_ENDPOINT=https://" + storeName + ":8080");
 			}
 		}
 	}
