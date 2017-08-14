@@ -145,7 +145,7 @@ const install = async function (sla) {
 				reject("Error adding permissions" + err);
 			});
 
-		resolve([containerConfig.Name, dependentStoreConfig.Name || "NO STORE"]);
+		resolve([containerConfig.Name, dependentStoreConfig ? dependentStoreConfig.Name : "NO STORE"]);
 	});
 };
 exports.install = install;

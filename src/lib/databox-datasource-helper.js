@@ -1,5 +1,5 @@
 
-var databoxRequest = require('./databox-request.js');
+const databoxRequest = require('./databox-request-promise.js');
 //var request = require('request');
 const WebSocketClient = require('ws');
 const httpsAgent = require('./databox-https-agent.js');
@@ -46,7 +46,7 @@ module.exports.registerActuator = function (storeEndPoint, driverName, actuatorN
           console.log("[ERROR] Can not register actuator subscription with datastore!", error);
           reject(error);
           return;
-        } else if(response && response.statusCode != 200) {
+        } else if(response && response.statusCode !== 200) {
           console.log("[ERROR] Can not register actuator subscription with datastore!", body);
           reject(body);
           return;
