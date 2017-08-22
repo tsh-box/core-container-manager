@@ -144,7 +144,7 @@ const installFromSLA = async function (sla) {
 						  return;
 					  });
 
-		resolve([containerConfig.Name,dependentStoreConfig.Name || "NO STORE"]);
+		resolve([containerConfig.Name,containerConfig.Name || "NO STORE"]);
 	});
 };
 exports.installFromSLA = installFromSLA;
