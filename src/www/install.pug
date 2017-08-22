@@ -77,7 +77,7 @@ html
 							sensor.hypercat = item;
 
 							console.log(sensor);
-							if (sensors == null) {
+							if (sensors === null) {
 								sensors = [sensor];
 							}
 							else {
@@ -90,7 +90,7 @@ html
 			}
 
 			function update() {
-				if (manifest != null) {
+				if (manifest !== null) {
 					$('#content').html(template({
 						manifest: manifest,
 						sensors: sensors
@@ -130,7 +130,7 @@ html
 
 			function installApp() {
 				$.ajax({
-					url: "/install",
+					url: "/api/install",
 					type: "POST",
 					data: JSON.stringify(manifest),
 					contentType: "application/json; charset=utf-8",

@@ -43,7 +43,7 @@
     "pug": "^2.0.0-beta6",
     "request": "^2.69.0",
     "selfsigned": "^1.8.0",
-    "socket.io": "^1.5.0",
+    "socket.io": "^2.0.3",
     "url": "^0.11.0",
     "yamljs": "^0.2.10"
   },

@@ -137,25 +137,121 @@ module.exports = {
 
 		});
 
-		app.get('/api/list/:type', (req, res) => {
+		app.get('/api/datasource/list', (req, res) => {
+			databoxRequestPromise({uri: 'https://arbiter:8080/cat'})
+				.then((request) => {
+					console.log(JSON.stringify(request));
+					let body = [];
+					request
+						.on('error', (error) => {
+							res.header('Access-Control-Allow-Origin', '*');
+							res.header('Access-Control-Allow-Credentials', true);
+							res.json([]);
+						})
+						.on('data', (chunk) => {
+							body.push(chunk);
+						})
+						.on('end', () => {
+							const json = JSON.parse(Buffer.concat(body).toString());
+							if ('items' in json) {
+								const promises = [];
+								for (const item of json.items) {
+									promises.push(new Promise((resolve, reject) => {
+										databoxRequestPromise({uri: item.href + '/cat'})
+											.then((request) => {
+												let body = [];
+												request
+													.on('error', (error) => {
+														resolve({});
+													})
+													.on('data', (chunk) => {
+														body.push(chunk);
+													})
+													.on('end', () => {
+														resolve(JSON.parse(Buffer.concat(body).toString()));
+													});
+											});
+									}));
+								}
+								return Promise.all(promises)
+									.then(results => {
+										let datasources = [];
+										for (const result of results) {
+											if ('items' in result) {
+												for (const item of result.items) {
+													datasources.push(item);
+													// if ('item-metadata' in item) {
+													// 	for(const metadataItem of item['item-metadata']) {
+													// 		if(metadataItem.rel === '') {
+													// 			datasources.push(item);
+													// 		}
+													// 	}
+													// }
+												}
+											}
+										}
+
+										res.header('Access-Control-Allow-Origin', '*');
+										res.header('Access-Control-Allow-Credentials', true);
+										res.json(datasources);
+									})
+									.catch(function (error) {
+										console.log(error);
+										res.header('Access-Control-Allow-Origin', '*');
+										res.header('Access-Control-Allow-Credentials', true);
+										res.json([]);
+									});
+							}
+						});
+				});
+		});
+
+		app.get('/api/installed/list', (req, res) => {
 			conman.listContainers()
 				.then((containers) => {
 					let results = [];
 					for (const container of containers) {
-						if (container.Labels['databox.type'] === req.params.type) {
-							results.push(container);
-						}
-						else if (req.params.type === 'system' && container.Labels['databox.type'] !== 'app'
-							&& container.Labels['databox.type'] !== 'driver' && container.Labels['databox.type'] !== 'store') {
-							results.push(container);
+						const name = container.Labels['com.docker.swarm.service.name'];
+						if (results.indexOf(name) === -1) {
+							results.push(name);
 						}
 					}
 
 					res.header('Access-Control-Allow-Origin', '*');
 					res.header('Access-Control-Allow-Credentials', true);
-					//res.header 'Access-Control-Allow-Methods', 'POST, GET, PUT, DELETE, OPTIONS'
-					//res.header 'Access-Control-Allow-Headers', 'Content-Type'
 					res.json(results);
+				});
+
+		});
+
+		app.get('/api/:type/list', (req, res) => {
+			conman.listContainers()
+				.then((containers) => {
+					let results = {};
+					for (const container of containers) {
+						if (req.params.type === 'all'
+							|| container.Labels['databox.type'] === req.params.type
+							|| (req.params.type === 'system'
+								&& container.Labels['databox.type'] !== 'app'
+								&& container.Labels['databox.type'] !== 'driver'
+								&& container.Labels['databox.type'] !== 'store')) {
+							const name = container.Labels['com.docker.swarm.service.name'];
+							if (results.hasOwnProperty(name)) {
+								const existing = results[name];
+								if (existing.Created < container.Created) {
+									results[name] = container;
+								}
+							}
+							else {
+								results[name] = container;
+							}
+
+						}
+					}
+
+					res.header('Access-Control-Allow-Origin', '*');
+					res.header('Access-Control-Allow-Credentials', true);
+					res.json(Object.keys(results).map(key => results[key]));
 				});
 		});
 
@@ -228,14 +324,22 @@ module.exports = {
 
 		});
 
+		app.options('/api/install', (req, res) => {
+			res.header('Access-Control-Allow-Origin', '*');
+			res.header('Access-Control-Allow-Credentials', true);
+			res.header('Access-Control-Allow-Methods', 'POST');
+			res.header('Access-Control-Allow-Headers', 'Content-Type');
+			res.json({status: 200, msg: "Success"});
+		});
+
 		const jsonParser = bodyParser.json();
-		app.post('/install', jsonParser, (req, res) => {
+		app.post('/api/install', jsonParser, (req, res) => {
 			const sla = req.body;
 			console.log(sla);
 			installingApps[sla.name] = sla['databox-type'] === undefined ? 'app' : sla['databox-type'];
 
 			io.emit('docker-create', sla.name);
-			conman.installFromSLA(sla)
+			conman.install(sla)
 				.then((config) => {
 					console.log('[' + sla.name + '] Installed', config);
 					for (const name of config) {
@@ -244,43 +348,64 @@ module.exports = {
 						console.log("Proxy added for ", name)
 					}
 
+					res.header('Access-Control-Allow-Origin', '*');
+					res.header('Access-Control-Allow-Credentials', true);
 					res.json({status: 200, msg: "Success"});
-				})
-				.then(() => {
-					return conman.saveSLA(sla);
 				})
 				.catch((error) => {
 					console.log(error);
 				});
 		});
 
+		app.options('/api/restart', (req, res) => {
+			res.header('Access-Control-Allow-Origin', '*');
+			res.header('Access-Control-Allow-Credentials', true);
+			res.header('Access-Control-Allow-Methods', 'POST');
+			res.header('Access-Control-Allow-Headers', 'Content-Type');
+			res.json({status: 200, msg: "Success"});
+		});
 
-		app.post('/uninstall', (req, res) => {
-			//console.log("Uninstalling " + req.body.id);
-			conman.getContainer(req.body.id)
-				.then((container) => {
-					return conman.stopContainer(container);
-				})
-				.then((container) => {
-					return conman.removeContainer(container);
-				})
-				.then((info) => {
-					let name = info.Name;
-					if (info.Name.startsWith('/')) {
-						name = info.Name.substring(1);
-					}
-					console.log('[' + name + '] Uninstalled');
-					delete this.proxies[name];
-					res.json(info);
+		app.post('/api/restart', (req, res) => {
+			res.header('Access-Control-Allow-Origin', '*');
+			res.header('Access-Control-Allow-Credentials', true);
+			conman.restart(req.body.id)
+				.then(() => {
+					res.json({status: 200, msg: "Success"});
 				})
 				.catch((err) => {
 					console.log(err);
+					res.status(500);
+					res.json(err)
+				});
+		});
+
+
+		app.options('/api/uninstall', (req, res) => {
+			res.header('Access-Control-Allow-Origin', '*');
+			res.header('Access-Control-Allow-Credentials', true);
+			res.header('Access-Control-Allow-Methods', 'POST');
+			res.header('Access-Control-Allow-Headers', 'Content-Type');
+			res.json({status: 200, msg: "Success"});
+		});
+
+		app.post('/api/uninstall', (req, res) => {
+			//console.log("Uninstalling " + req.body.id);
+			const name = req.body.id;
+			res.header('Access-Control-Allow-Origin', '*');
+			res.header('Access-Control-Allow-Credentials', true);
+			conman.uninstall(name)
+				.then(() => {
+					console.log('[' + name + '] Uninstalled');
+					res.json({"status": "success"});
+				})
+				.catch((err) => {
+					console.log(err);
+					res.status(500);
 					res.json(err)
 				});
 		});
 
 		io.on('connection', (socket) => {
-
 			dockerEmitter.on("connect", () => {
 				socket.emit('docker-connect');
 			});
