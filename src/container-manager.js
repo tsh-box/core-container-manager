@@ -365,7 +365,7 @@ const storeConfig = function (configTemplate, sla) {
 
 async function addPermissionsFromSla(sla) {
 
-	console.log("addPermissionsFromSla", sla);
+	console.log("addPermissionsFromSla");
 
 	const localContainerName = sla.name + ARCH;
 	const type = sla['databox-type'];
@@ -394,9 +394,10 @@ async function addPermissionsFromSla(sla) {
 	//set read permissions from the sla for DATASOURCES.
 	if (sla.datasources && type === 'app') {
 		for (let allowedDatasource of sla.datasources) {
-			if (allowedDatasource.endpoint) {
-				let datasourceEndpoint = url.parse(allowedDatasource.endpoint);
-				let datasourceName = allowedDatasource.datasource;
+			if (allowedDatasource.hypercat) {
+
+				let datasourceEndpoint = url.parse(allowedDatasource.hypercat['href']);
+				let datasourceName = datasourceEndpoint.path.replace('/','');
 
 				const isActuator = allowedDatasource.hypercat['item-metadata'].findIndex((itm) => {
 					return (itm.rel === 'urn:X-databox:rels:isActuator') && (itm.val === true);
