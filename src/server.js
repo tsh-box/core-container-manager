@@ -14,11 +14,6 @@ if (DATABOX_SDK) {
 	Config.storeUrl = Config.storeUrl_sdk;
 }
 
-const Docker = require('dockerode');
-const DockerEvents = require('docker-events');
-const docker = new Docker();
-const dockerEmitter = new DockerEvents({docker: docker});
-
 const http = require('http');
 const https = require('https');
 const express = require('express');
@@ -26,7 +21,6 @@ const bodyParser = require('body-parser');
 const request = require('request');
 const databoxRequestPromise = require('./lib/databox-request-promise.js');
 const databoxAgent = require('./lib/databox-https-agent.js');
-let io = require('socket.io');
 const url = require('url');
 
 const app = express();
@@ -38,7 +32,6 @@ module.exports = {
 
 		const server = http.createServer(app);
 		const installingApps = {};
-		io = io(server, {});
 
 		if (DATABOX_DEV) {
 			this.proxies.store = "http://" + Config.localAppStoreName + ":8181";
@@ -96,46 +89,6 @@ module.exports = {
 		// Needs to be after the proxy
 		app.use(bodyParser.json());
 		app.use(bodyParser.urlencoded({extended: false}));
-
-		app.get('/', (req, res) => {
-			res.render('index');
-		});
-		app.get('/install/:appname', (req, res) => {
-			res.render('install', {appname: req.params.appname})
-		});
-
-		app.get('/ui/:containerName', (req, res) => {
-			let containerName = req.params.containerName;
-			conman.listContainers()
-				.then((containers) => {
-					return new Promise((resolve, reject) => {
-						for (const container of containers) {
-							const name = container.Names[0].substr(1).split('.')[0];
-							if (name === containerName) {
-								resolve({
-									name: name,
-									container_id: container.Id,
-									type: container.Labels['databox.type'] === undefined ? 'app' : container.Labels['databox.type'],
-									status: container.State
-								});
-								return;
-							}
-						}
-						reject("[Error] " + containerName + " not found.");
-					});
-				})
-				.then((containerInfo) => {
-					let path = '/ui';
-					if (containerInfo.type === 'store') {
-						path = '/cat';
-					}
-					res.render('ui', {appname: containerInfo.name, path: path});
-				})
-				.catch((error) => {
-					res.render('ui', {error: error});
-				});
-
-		});
 
 		app.get('/api/datasource/list', (req, res) => {
 			databoxRequestPromise({uri: 'https://arbiter:8080/cat'})
@@ -338,7 +291,6 @@ module.exports = {
 			console.log(sla);
 			installingApps[sla.name] = sla['databox-type'] === undefined ? 'app' : sla['databox-type'];
 
-			io.emit('docker-create', sla.name);
 			conman.install(sla)
 				.then((config) => {
 					console.log('[' + sla.name + '] Installed', config);
@@ -403,35 +355,6 @@ module.exports = {
 					res.status(500);
 					res.json(err)
 				});
-		});
-
-		io.on('connection', (socket) => {
-			dockerEmitter.on("connect", () => {
-				socket.emit('docker-connect');
-			});
-			dockerEmitter.on("disconnect", () => {
-				socket.emit('docker-disconnect');
-			});
-			dockerEmitter.on("_message", (message) => {
-				socket.emit('docker-_message', message);
-			});
-			dockerEmitter.on("create", (message) => {
-				socket.emit('docker-create', message);
-			});
-			dockerEmitter.on("start", (message) => {
-				socket.emit('docker-star', message);
-			});
-			dockerEmitter.on("start", (message) => {
-				socket.emit('docker-stop', message);
-			});
-			dockerEmitter.on("die", (message) => {
-				socket.emit('docker-die', message);
-			});
-			dockerEmitter.on("destroy", (message) => {
-				socket.emit('docker-destroy', message);
-			});
-			dockerEmitter.start();
-
 		});
 
 		server.listen(port);
