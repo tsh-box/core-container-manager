@@ -21,8 +21,6 @@ const ip = '127.0.0.1';
 const arbiterKey = fs.readFileSync("/run/secrets/CM_KEY", {encoding: 'base64'});
 
 const DATABOX_ARBITER_ENDPOINT = "https://arbiter:8080";
-const DATABOX_LOGSTORE_ENDPOINT = "https://syslog:8080";
-const DATABOX_LOGSTORE_NAME = "syslog";
 const DATABOX_EXPORT_SERVICE_ENDPOINT = "https://export-service:8080";
 
 //setup dev env
@@ -280,7 +278,6 @@ const appConfig = function (config, sla) {
 		Env: [
 			"DATABOX_LOCAL_NAME=" + localContainerName,
 			"DATABOX_ARBITER_ENDPOINT=" + DATABOX_ARBITER_ENDPOINT,
-			"DATABOX_LOGSTORE_ENDPOINT=" + DATABOX_LOGSTORE_ENDPOINT + '/' + localContainerName,
 			"DATABOX_EXPORT_SERVICE_ENDPOINT=" + DATABOX_EXPORT_SERVICE_ENDPOINT
 		],
 		secrets: []
@@ -343,7 +340,6 @@ const storeConfig = function (configTemplate, sla) {
 			Env: [
 				"DATABOX_LOCAL_NAME=" + requiredName,
 				"DATABOX_ARBITER_ENDPOINT=" + DATABOX_ARBITER_ENDPOINT,
-				"DATABOX_LOGSTORE_ENDPOINT=" + DATABOX_LOGSTORE_ENDPOINT + '/' + requiredName,
 			],
 			secrets: []
 		};
@@ -520,12 +516,6 @@ async function addPermissionsFromSla(sla) {
 				route: {target: store.name, path: '/cat', method: 'POST'}
 			}));
 
-			//Grant permissions for the store to write to the log
-			console.log('[Adding write permissions] for ' + store.name + ' on ' + DATABOX_LOGSTORE_NAME + '/' + store.name);
-			proms.push(updateContainerPermissions({
-				name: store.name,
-				route: {target: DATABOX_LOGSTORE_NAME, path: '/' + store.name, method: 'POST'}
-			}));
 		}
 
 	}
