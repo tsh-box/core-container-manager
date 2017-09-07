@@ -379,14 +379,16 @@ async function addPermissionsFromSla(sla) {
 		}).join(',');
 
 		console.log("[Adding Export permissions for " + localContainerName + "] on " + urlsString);
-		proms.push(updateContainerPermissions({
+
+	        let targetName = url.parse(DATABOX_EXPORT_SERVICE_ENDPOINT).hostname;
+	        proms.push(updateContainerPermissions({
 			name: localContainerName,
-			route: {target: DATABOX_EXPORT_SERVICE_ENDPOINT, path: '/export/', method: 'POST'},
+			route: {target: targetName, path: '/export/', method: 'POST'},
 			caveats: ["destination = [" + urlsString + "]"]
 		}));
 		proms.push(updateContainerPermissions({
 			name: localContainerName,
-			route: {target: DATABOX_EXPORT_SERVICE_ENDPOINT, path: '/lp/export/', method: 'POST'},
+			route: {target: targetName, path: '/lp/export/', method: 'POST'},
 			caveats: ["destination = [" + urlsString + "]"]
 		}));
 	}
