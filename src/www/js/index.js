@@ -11,6 +11,7 @@ const stores = [
 	// }
 ];
 
+const sensorDriver = 'driver-sensingkit';
 const isApp = typeof cordova !== 'undefined';
 let databoxURL = 'http://localhost:8989/';
 if (!isApp) {
@@ -225,11 +226,12 @@ router.on('/driver/store', () => {
 router.on('/sensing', () => {
 	toolbarDrawer();
 	showSpinner();
-	fetch(databoxURL + 'api/driver/list')
+	fetch(databoxURL + 'api/installed/list')
 		.then(checkOk)
 		.then((res) => res.json())
 		.then((json) => {
-			if(true) {
+			console.log(json);
+			if (json.indexOf(sensorDriver) === -1) {
 				document.getElementById('content').innerHTML = alertTemplate({
 					icon: 'network_check',
 					button: 'Enable Mobile Sensor Data'
@@ -238,7 +240,7 @@ router.on('/sensing', () => {
 					showSpinner();
 					listApps('driver')
 						.then((apps) => {
-							const osApp = apps['driver-sensingkit'];
+							const osApp = apps[sensorDriver];
 							const manifest = osApp[0].manifest;
 							if(osApp) {
 								fetch(databoxURL + "api/install", {
@@ -256,6 +258,8 @@ router.on('/sensing', () => {
 						});
 
 				});
+			} else {
+				// TODO List sensors
 			}
 		})
 		.catch((error) => {
