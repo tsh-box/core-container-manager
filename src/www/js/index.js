@@ -223,6 +223,69 @@ router.on('/driver/store', () => {
 		});
 });
 
+function showSensingInstall() {
+	document.getElementById('content').innerHTML = alertTemplate({
+		icon: 'network_check',
+		button: 'Enable Mobile Sensor Data'
+	});
+	document.getElementById('alert_button').addEventListener('click', () => {
+		showSpinner();
+		listApps('driver')
+			.then((apps) => {
+				const osApp = apps[sensorDriver];
+				const manifest = osApp[0].manifest;
+				if (osApp) {
+					fetch(databoxURL + "api/install", {
+						headers: {
+							'Content-Type': 'application/json'
+						},
+						method: "POST",
+						body: JSON.stringify(manifest),
+					})
+						.then(checkOk)
+						.then((res) => {
+							showSensingStart();
+						});
+				}
+			});
+	});
+}
+
+function showSensingStart() {
+	SensingKit.isRunning((result) => {
+		console.log(result);
+		if(result === 'true')
+		{
+			showSpinner();
+			SensingKit.start(databoxURL + sensorDriver, (error) => {
+				console.log(error);
+				const url = databoxURL + sensorDriver + '/ui';
+				const iframe = document.createElement("iframe");
+				iframe.setAttribute("src", url);
+
+				const content = document.getElementById('content');
+
+				iframe.style.height = (document.documentElement.clientHeight - 56) + 'px';
+				content.innerHTML = '';
+				content.appendChild(iframe);
+			});
+		}
+		else
+		{
+			document.getElementById('content').innerHTML = alertTemplate({
+				icon: 'network_check',
+				button: 'Start Recording Mobile Sensor Data'
+			});
+			document.getElementById('alert_button').addEventListener('click', () => {
+				SensingKit.start(databoxURL + sensorDriver, (error) => {
+					console.log(error);
+					showSensingStart();
+				});
+			});
+		}
+	});
+}
+
 router.on('/sensing', () => {
 	toolbarDrawer();
 	showSpinner();
@@ -232,34 +295,9 @@ router.on('/sensing', () => {
 		.then((json) => {
 			console.log(json);
 			if (json.indexOf(sensorDriver) === -1) {
-				document.getElementById('content').innerHTML = alertTemplate({
-					icon: 'network_check',
-					button: 'Enable Mobile Sensor Data'
-				});
-				document.getElementById('alert_button').addEventListener('click', () => {
-					showSpinner();
-					listApps('driver')
-						.then((apps) => {
-							const osApp = apps[sensorDriver];
-							const manifest = osApp[0].manifest;
-							if(osApp) {
-								fetch(databoxURL + "api/install", {
-									headers: {
-										'Content-Type': 'application/json'
-									},
-									method: "POST",
-									body: JSON.stringify(manifest),
-								})
-									.then(checkOk)
-									.then((res) => {
-
-									});
-							}
-						});
-
-				});
+				showSensingInstall();
 			} else {
-				// TODO List sensors
+				showSensingStart();
 			}
 		})
 		.catch((error) => {
