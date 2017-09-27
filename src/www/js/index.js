@@ -17,9 +17,8 @@ let databoxURL = 'http://localhost:8989/';
 if (!isApp) {
 	const url = new URL(window.location);
 	databoxURL = url.protocol + '//' + url.host + '/';
-	document.getElementById('sensing').style.display = 'none';
+	//document.getElementById('sensing').style.display = 'none';
 }
-let apps;
 
 function checkOk(res) {
 	if (!res.ok) {
@@ -142,46 +141,41 @@ function toolbarBack() {
 
 function listApps(type) {
 	let promise;
-	if (!apps) {
-		let proms = [];
-		for (let store of stores) {
-			proms.push(fetch(store.url + 'app/list')
-				.then(checkOk)
-				.then((res) => res.json())
-				.then((json) => {
-					for (const app of json.apps) {
-						app.url = store.url + 'app/get/?name=' + app.manifest.name;
-						app.store = store.name;
-						app.displayName = app.manifest.name.replace('databox', '').replace('driver-', '').replace('app-', '').split('-').join(' ').trim();
-					}
-					return json;
-				})
-				.catch((error) => {
-					return {'apps': []}
-				}));
-		}
-		promise = Promise.all(proms)
-			.then((appLists) => {
-				apps = {};
-				for (const appList of appLists) {
-					for (const app of appList.apps) {
-						const name = app.manifest.name;
-						let versions = [];
-						if (name in apps) {
-							versions = apps[name];
-						}
 
-						versions.push(app);
-						apps[name] = versions;
-					}
+	let proms = [];
+	for (let store of stores) {
+		proms.push(fetch(store.url + 'app/list')
+			.then(checkOk)
+			.then((res) => res.json())
+			.then((json) => {
+				for (const app of json.apps) {
+					app.url = store.url + 'app/get/?name=' + app.manifest.name;
+					app.store = store.name;
+					app.displayName = app.manifest.name.replace('databox', '').replace('driver-', '').replace('app-', '').split('-').join(' ').trim();
 				}
-				return apps;
-			});
-	} else {
-		promise = new Promise((resolve) => {
-			resolve(apps);
-		})
+				return json;
+			})
+			.catch((error) => {
+				return {'apps': []}
+			}));
 	}
+	promise = Promise.all(proms)
+		.then((appLists) => {
+			let apps = {};
+			for (const appList of appLists) {
+				for (const app of appList.apps) {
+					const name = app.manifest.name;
+					let versions = [];
+					if (name in apps) {
+						versions = apps[name];
+					}
+
+					versions.push(app);
+					apps[name] = versions;
+				}
+			}
+			return apps;
+		});
 
 	if (type) {
 		const appType = type;
