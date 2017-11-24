@@ -10,6 +10,8 @@ const Docker = require('dockerode');
 const docker = new Docker();
 const db = require('./include/container-manager-db.js');
 
+const databoxNet = require('./lib/databox-network-helper.js')(docker);
+
 //ARCH to append -arm to the end of a container name if running on arm
 //swarm mode dose not use this for now
 let ARCH = '';
@@ -110,6 +112,9 @@ const install = async function (sla) {
 			"UpdateConfig": {
 				"Parallelism": 1
 			},
+			"EndpointSpec": {
+				"Mode": "dnsrr"
+			},
 			"Networks": []
 		};
 
@@ -117,16 +122,19 @@ const install = async function (sla) {
 		let dependentStoreConfigTemplate = JSON.parse(JSON.stringify(containerConfig));
 		let dependentStoreConfigArray;
 
+		let networkConfig = await databoxNet.preConfig(sla);
+		console.log("preconfig: ", networkConfig);
+
 		switch (sla['databox-type']) {
 			case 'app':
-				containerConfig = appConfig(containerConfig, sla);
+				containerConfig = appConfig(containerConfig, sla, networkConfig);
 				containerConfig = await createSecrets(containerConfig, sla);
-				dependentStoreConfigArray = storeConfig(dependentStoreConfigTemplate, sla);
+				dependentStoreConfigArray = storeConfig(dependentStoreConfigTemplate, sla, networkConfig);
 				break;
 			case 'driver':
-				containerConfig = driverConfig(containerConfig, sla);
+				containerConfig = driverConfig(containerConfig, sla, networkConfig);
 				containerConfig = await createSecrets(containerConfig, sla);
-				dependentStoreConfigArray = storeConfig(dependentStoreConfigTemplate, sla);
+				dependentStoreConfigArray = storeConfig(dependentStoreConfigTemplate, sla, networkConfig);
 				break;
 			default:
 				reject('Missing or unsupported databox-type in SLA');
@@ -134,6 +142,9 @@ const install = async function (sla) {
 		}
 
 		saveSLA(sla);
+
+		//RELAY ON config.TaskTemplate.ContainerSpec.Env to find out communication peers
+		await databoxNet.connectEndpoints(containerConfig, dependentStoreConfigArray, sla);
 
 		//UPDATE SERVICES
 		let dependentStoreConfig;
@@ -169,6 +180,7 @@ const install = async function (sla) {
 exports.install = install;
 
 const uninstall = async function (name) {
+	let networkConfig = await databoxNet.networkOfService(name);
 	return docker.getService(name).remove()
 		.then(() => docker.listSecrets({filters: {'label': ['databox.service.name=' + name]}}))
 		.then((secrets) => {
@@ -179,6 +191,7 @@ const uninstall = async function (name) {
 
 			return Promise.all(proms)
 		})
+		.then(() => databoxNet.postUninstall(name, networkConfig))
 		.then(() => db.deleteSLA(name, false));
 };
 exports.uninstall = uninstall;
@@ -254,6 +267,7 @@ const createSecrets = async function (config, sla) {
 	return config
 };
 
+
 function calculateImageVersion (registry) {
 
 	if(DATABOX_DEV == 1) {
@@ -266,8 +280,10 @@ function calculateImageVersion (registry) {
 
 }
 
-const driverConfig = function (config, sla) {
-	console.log("addDriverConfig");
+
+const driverConfig = function (config, sla, network) {
+
+  console.log("addDriverConfig");
 
 	let localContainerName = sla.name + ARCH;
 
@@ -281,7 +297,10 @@ const driverConfig = function (config, sla) {
 			"DATABOX_LOCAL_NAME=" + localContainerName,
 			"DATABOX_ARBITER_ENDPOINT=" + DATABOX_ARBITER_ENDPOINT,
 		],
-		secrets: []
+		secrets: [],
+		DNSConfig: {
+			NameServers: [network.DNS]
+		}
 	};
 
 	if (sla['resource-requirements'] && sla['resource-requirements']['store']) {
@@ -299,7 +318,8 @@ const driverConfig = function (config, sla) {
 	}
 
 
-	config.Networks.push({Target: 'databox_databox-driver-net'});
+	//config.Networks.push({Target: 'databox_databox-driver-net'});
+	config.Networks.push({Target: network.NetworkName});
 	config.Name = localContainerName;
 	config.TaskTemplate.ContainerSpec = driver;
 	config.TaskTemplate.Placement.constraints = ["node.role == manager"];
@@ -307,7 +327,7 @@ const driverConfig = function (config, sla) {
 	return config;
 };
 
-const appConfig = function (config, sla) {
+const appConfig = function (config, sla, network) {
 	let localContainerName = sla.name + ARCH;
 
 	let registryUrl = getRegistryUrlFromSLA(sla);
@@ -321,7 +341,10 @@ const appConfig = function (config, sla) {
 			"DATABOX_ARBITER_ENDPOINT=" + DATABOX_ARBITER_ENDPOINT,
 			"DATABOX_EXPORT_SERVICE_ENDPOINT=" + DATABOX_EXPORT_SERVICE_ENDPOINT
 		],
-		secrets: []
+		secrets: [],
+		DNSConfig: {
+			NameServers: [network.DNS]
+		}
 	};
 
 	//packages are being removed.
@@ -352,14 +375,15 @@ const appConfig = function (config, sla) {
 		}
 	}
 
-	config.Networks.push({Target: 'databox_databox-app-net'});
+	//config.Networks.push({Target: 'databox_databox-app-net'});
+	config.Networks.push({Target: network.NetworkName});
 	config.Name = localContainerName;
 	config.TaskTemplate.ContainerSpec = app;
 	config.TaskTemplate.Placement.constraints = ["node.role == manager"];
 	return config;
 };
 
-const storeConfig = function (configTemplate, sla) {
+const storeConfig = function (configTemplate, sla, network) {
 	console.log("addStoreConfig");
 
 	if (!sla['resource-requirements'] || !sla['resource-requirements']['store']) {
@@ -386,11 +410,15 @@ const storeConfig = function (configTemplate, sla) {
 				"DATABOX_LOCAL_NAME=" + requiredName,
 				"DATABOX_ARBITER_ENDPOINT=" + DATABOX_ARBITER_ENDPOINT,
 			],
-			secrets: []
+			secrets: [],
+			DNSConfig: {
+				NameServers: [network.DNS]
+			}
 		};
 
-		config.Networks.push({Target: 'databox_databox-driver-net'});
-		config.Networks.push({Target: 'databox_databox-app-net'});
+		//config.Networks.push({Target: 'databox_databox-driver-net'});
+		//config.Networks.push({Target: 'databox_databox-app-net'});
+		config.Networks.push({Target: network.NetworkName});
 
 		let vol = "/database"
 		store.Mounts = [{Source:requiredName, Target: vol, type:"volume"}]
@@ -571,12 +599,14 @@ async function addPermissionsFromSla(sla) {
 
 exports.connect = function () {
 	return new Promise((resolve, reject) => docker.ping(function (err, data) {
-		if (err) {
-			reject("Cant connect to docker!");
-			return;
-		}
-		resolve();
-	}));
+			if (err) {
+				reject("Cant connect to docker!");
+				return;
+			}
+			resolve();
+		}))
+		.then(() => databoxNet.identifySelf())
+		.then(() => databoxNet.identifyCM());
 };
 
 const listContainers = function () {
