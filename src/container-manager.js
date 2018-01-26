@@ -802,26 +802,19 @@ const saveSLA = function (sla) {
 	return db.putSLA(sla.name, sla);
 };
 
-exports.restoreContainers = function (slas) {
+exports.reloadInstalledComponents = function () {
 	return new Promise((resolve, reject) => {
-		let infos = [];
-		let result = Promise.resolve();
-		slas.forEach(sla => {
-			console.log("Launching Container:: " + sla.name);
-			result = result.then((info) => {
-				infos.push(info);
-				return launchContainer(sla);
+		getActiveSLAs()
+		.then((slas)=>{
+			slas.forEach(sla => {
+				console.log("Launching previously installed component:: " + sla.name);
+				install(sla)
 			});
-		});
-		result = result.then((info) => {
-			infos.push(info);
-			infos.shift(); //remove unneeded first item.
-			resolve(infos);
-		});
-		return result;
+			resolve(slas)
+		})
 	});
-};
+}
 
-exports.getActiveSLAs = function () {
+let getActiveSLAs = function () {
 	return db.getAllSLAs();
 };
