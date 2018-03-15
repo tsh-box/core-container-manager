@@ -2,7 +2,7 @@
 # Databox Container Manager
 
 Databox container manager and dashboard are the part of the databox platform.
-see [the main repository](https://github.com/me-box/databox) for more information. 
+see [the main repository](https://github.com/tsh2/databox) for more information. 
 
 For developing Databox core components - Container Manager (CM) exposes following functions:
 1. `setHttpsHelper(helper)`: this function provides a https-agent with Databox root certificate, so that arbitor accepts   requests by the https-agent.
