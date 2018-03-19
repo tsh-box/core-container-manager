@@ -25,7 +25,7 @@ httpsHelper.init()
 			containerMangerUIServer.proxies[sla.name] = sla.name + ':8080';
 		});
 
-		console.log("Starting UI Server!!");
+		console.log("Starting UI Server!! V.0.2.0 modified by LLA");
 		console.log("Password = " + authToken.token);
 		return containerMangerUIServer.launch(conman);
 	})
